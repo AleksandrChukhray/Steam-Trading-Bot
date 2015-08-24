@@ -1,6 +1,7 @@
 module.exports={
-username : "steam login",
-password : "and password",
+username : "truesupp",
+password : "",
 domain : 'glebka.me',
-webApiKey : "asdasd"
+webApiKey : "asdasd",
+    game: 'CSGO'
 }

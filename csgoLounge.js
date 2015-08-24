@@ -28,15 +28,12 @@ var csgoLounge = function(item,cookies,maxPages){
 		debug('Now we can handle gotten links, total unique links parsed: ', self.tradeLinksArray.length,'. Cutting...')
 		self.cutLinks()
 	})
-	this.on('done',function(){
-	debug('done')
-	})
 }
 
 csgoLounge.prototype = new events.EventEmitter;
 
 csgoLounge.prototype.nameToLoungeId = function (name){
-	loungeId = '39'
+	loungeId = '718'
 	return loungeId
 }
 
@@ -158,5 +155,4 @@ function unique (arr) {
 
 module.exports = csgoLounge
 
-var lol = new csgoLounge('ITEM');
 
