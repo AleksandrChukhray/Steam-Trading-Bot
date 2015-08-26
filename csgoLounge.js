@@ -3,10 +3,19 @@ var http = require('http'),
 	cheerio = require('cheerio'),
 	events = require('events'),
 	fs = require('fs'),
-	debug = require('debug')('cslParser')
+	debug = require('debug')('cslParser'),
+  mysql      = require('mysql')
 
 var csgoLounge = function(item,cookies,maxPages){
 	var self = this
+	this.connection = mysql.createConnection({
+		host     : 'localhost',
+		user     : 'root',
+		password : 'root',
+		database : 'steambot'
+	});
+	this.connection.connect();
+	this.loungeId;
 	this.tradeList = []
 	this.tradeLinksArray = []
 	this.totalMissingLinks = []
@@ -17,7 +26,10 @@ var csgoLounge = function(item,cookies,maxPages){
 	this.maxPages = maxPages
 	this.totalRequiredTradesNumber = this.maxPages*this.tradesPerPage
 	this.cookies = request.cookie(cookies)
-	this.parseLounge(item)
+	this.nameToLoungeId(item)
+	this.on('gotLoungeId',function(){
+		this.parseLounge()
+	})
 	this.on('tradesParsingIsComplete',function(){
 		self.tradeList.forEach(function(item,i,arr){
 			 self.parseTradeLink(item)
@@ -33,8 +45,17 @@ var csgoLounge = function(item,cookies,maxPages){
 csgoLounge.prototype = new events.EventEmitter;
 
 csgoLounge.prototype.nameToLoungeId = function (name){
-	loungeId = '718'
-	return loungeId
+	self = this
+	if(name[0] = '?'){
+		name = name.slice(2)
+	}
+	debug('Converting ',name,' to loungeID')
+	this.connection.query("SELECT id FROM loungeIds WHERE itemname = '" + name + "'", function(err, rows, fields) {
+		if (err) throw err;
+		self.loungeId = rows[0].id
+		debug('Got loungeID: ', rows[0].id)
+		self.emit('gotLoungeId')
+	});
 }
 
 csgoLounge.prototype.cutLinks  = function(){
@@ -66,10 +87,9 @@ csgoLounge.prototype.getLinks = function(id){
 
 csgoLounge.prototype.parseLounge = function (itemname){
 	var self = this
-	id = self.nameToLoungeId(itemname)
 	page = 1;
 	while(page <= self.maxPages) {
-		loungeUrl = 'http://csgolounge.com/result?&rquality%5B%5D=0&rdef_index%5B%5D=' + id + '&p=' + page
+		loungeUrl = 'http://csgolounge.com/result?&rquality%5B%5D=0&rdef_index%5B%5D=' + self.loungeId + '&p=' + page
 		self.parseTrades(loungeUrl)
 		page++;
 	}
@@ -124,11 +144,11 @@ csgoLounge.prototype.parseTradeLink = function (url){
 				//});
 				//Getting steamoffer link
 				checkButtonExist = s('div#offer>a.buttonright').text()
+				diff = self.tradeList.length - self.totalMissingLinks.length
 				if(checkButtonExist) {
 					s('div#offer>a.buttonright').each(function () {
 						tradeLink = s(this).attr('href')
 						self.tradeLinksArray.push(tradeLink)
-						diff = self.tradeList.length - self.totalMissingLinks.length
 						debug('Got ',self.tradeLinksArray.length,' out off ',diff,' links')
 						if(self.tradeLinksArray.length == diff ) {
 							debug('Got enougt links,emiting event...')
@@ -139,6 +159,10 @@ csgoLounge.prototype.parseTradeLink = function (url){
 				else{
 					self.totalMissingLinks.push('ss')
 					debug('The tradeoffer button is not exist')
+					if(self.tradeLinksArray.length >= diff ) {
+						debug('Got enougt links,emiting event...')
+						self.emit('linksParsingIsComplete');
+					}
 				}
 
 			}

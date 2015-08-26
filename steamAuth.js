@@ -19,6 +19,9 @@ var contextid = {
 var steamAuth = function(cfg){
 	self = this
 	this.myBackpack = [];
+	this.tradeId = 0;
+	this.successTrade = 0;
+	this.erorrTrade = 0;
 	this.game = cfg.game
 	debug('Authoritation user: ',cfg.username)
 	this.client = new SteamUser();
@@ -106,38 +109,65 @@ function getProfitItems(itemCost){ // looking  for items in market which cost  a
 steamAuth.prototype.getItem = function(id){
 	return this.myBackpack[id]
 }
-steamAuth.prototype.getItemObjectFromSomeInventory = function(steamID,itemName,item){
-	var trade = self.offers.createOffer(steamID);
+steamAuth.prototype.getItemObjectFromSomeInventory = function(trade,itemName,item,tradeId){
+	var self = this
 	trade.loadPartnerInventory(appid[self.game],contextid[self.game], function(err,inventory){
-		debug('We got some inventory')
-		for(i=0;i<=inventory.length;i++){
-			if(inventory[i].name == itemName){
-				debug('Found needed weapon in partner inventory')
-				item.push(inventory[i])
-				self.emit('hisItemFound')
-				break
+		if(!err) {
+			debug('We got some inventory')
+			for (i = 0; i < inventory.length; i++) {
+				if (inventory[i].market_hash_name == itemName) {
+					debug('Found needed weapon in partner inventory')
+					item.push(inventory[i])
+					self.emit('hisItemFound' + tradeId)
+					break
+				}
+			}
+			if (!item) {
+				debug('Item was not found')
+				self.erorrTrade++;
 			}
 		}
-		if(!item){
-			debug('Item was not found')
+		else{
+			debug(err)
 		}
 	});
 }
-steamAuth.prototype.createOffer = function (steamID,accessToken,hisItems,myItems,tradeMessage){
+steamAuth.prototype.createOffer = function (steamID,accessToken,hisItemName,myItems,tradeMessage){
 	self = this
+	this.tradeId++;
+	var  hisItems=[];
+	var tradeId= this.tradeId
 	if(!tradeMessage) {tradeMessage = 'Hey! Do you want to trade so?' }
 	var trade = self.offers.createOffer(steamID);
 	trade.addMyItems(myItems);
-	trade.addTheirItems(hisItems);
+	self.getItemObjectFromSomeInventory(trade,hisItemName,hisItems,tradeId);//нужен итем из конкретного инвентаря :(((
+	this.on('hisItemFound'+tradeId, function () {
+		trade.addTheirItems(hisItems);
+		function tradesDone(self)		{
+			if (self.successTrade+self.erorrTrade == self.tradeId ){
+				debug('Done.Total trades:',self.tradeId,'. Success: ', self.successTrade,'. Erorr: ',self.erorrTrade, '.');
+				proccess.exit(1)
+			}
+		}
 		trade.send(tradeMessage, accessToken,function (err, status){
 			if (err) {
 				debug(err);
+				self.erorrTrade++;
+				tradesDone(self);
+
 			} else if (status == 'pending'){
 				debug('Trade offer sent but awaiting email confirmation. You should probably turn off email confirmation here: http://steamcommunity.com/my/edit/settings/');
+				self.successTrade++;
+				tradesDone(self);
 			} else {
 				debug('Trade offer sent successfully');
+				self.successTrade++;
+				tradesDone(self);
+
 			}
 		});
+	})
+
 }
 
 cfg={

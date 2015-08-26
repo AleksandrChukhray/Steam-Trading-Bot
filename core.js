@@ -2,26 +2,20 @@
 var cfg = require('./cfg')
 var steamAuth = require('./steamAuth')
 var csgoLounge = require('./csgoLounge')
-
 var bot = new steamAuth(cfg)
-bot.on('gotBackpack',function showBackpack(){   // do something
-    var hisItemName = '★ M9 Bayonet'
-    var myItems = [bot.getItem(5)]
-    var hisItems = [];
-    bot.getItemObjectFromSomeInventory('[U:1:123522147]',hisItemName,hisItems);
-    bot.on('hisItemFound',function(){
-        partner = '[U:1:123522147]'
-        token = 'yWeV97p9'
-        bot.createOffer(partner,token,hisItems,myItems,'Drochi moi chlen sebe v rot')
+var myItems = []
+var hisItemName = '★ M9 Bayonet | Fade (Factory New)' // Имя предмета который хотим получить при обмене
+bot.on('gotBackpack',function (){
+    myItems = [bot.getItem(5)] //Предмет ( или предметы, через запятую), которые хотим отдать.
+    bayonet = new csgoLounge(hisItemName,'',1)
+    bayonet.on('done', function() {
+        console.log('done')
+        traders = bayonet.getLinks();
+        tradeMessage = 'Drochi moi chlen sebe v rot'
+        traders.forEach(function (item, i, arr) {
+            bot.createOffer(item.partner, item.token, hisItemName, myItems,tradeMessage )
+        })
     })
-
-    //bot.createOffer(partner,token,hisItemName,myItem)
-    //itemname = '★ M9 Bayonet'
-    //var bayonet = new csgoLounge(itemname,'',5)
-    //bayonet.on('done', function(){
-    //    traders = bayonet.getLinks();
-    //    traders.forEach(function(item,i,arr){
-    //        steamAuth.sendTradeOffer(offers,item.partner,item.token,'',backpack[6])
-    //    })
-    //})
 })
+
+
