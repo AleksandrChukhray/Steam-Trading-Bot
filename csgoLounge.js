@@ -20,8 +20,12 @@ var csgoLounge = function(item,cookies,maxPages){
 	this.tradeLinksArray = []
 	this.totalMissingLinks = []
 	this.finalArray = []
-	if(!maxPages) {maxPages=1}
-	if(!cookies) {cookies = 'PHPSESSID=qcgqquo4o50cp5clm75bs45lj5; tkz=c2cab3e2ff888ce4ecb06091e5a69db8; __utmt=1; id=76561198063846956; token=3a2adaf608ed50e29f2d29b59338ed06; __utma=210545287.444262926.1440134376.1440354373.1440357545.23; __utmb=210545287.3.10.1440357545; __utmc=210545287; __utmz=210545287.1440134376.1.1.utmcsr=(direct)|utmccn=(direct)|utmcmd=(none)'}
+	if(!maxPages) {
+		maxPages=1
+	}
+	if(!cookies) {
+		cookies = 'PHPSESSID=qcgqquo4o50cp5clm75bs45lj5; tkz=c2cab3e2ff888ce4ecb06091e5a69db8; id=76561198063846956; token=ced748210fe6a8a2e439edd9040046de; __utmt=1; __utma=210545287.696016616.1440737987.1440867298.1440909464.10; __utmb=210545287.9.10.1440909464; __utmc=210545287; __utmz=210545287.1440737987.1.1.utmcsr=(direct)|utmccn=(direct)|utmcmd=(none)'
+	}
 	this.tradesPerPage = 20 //const
 	this.maxPages = maxPages
 	this.totalRequiredTradesNumber = this.maxPages*this.tradesPerPage
@@ -99,7 +103,7 @@ csgoLounge.prototype.parseTrades = function(url){
 	request({uri: url, method: 'GET', encoding: 'binary'},
 		function (err, res, body) {
 			if(err){
-				debug('Got erorr, while requesting.Retrying',err)
+				debug('Got erorr, while requesting Trades.Retrying',err)
 				self.parseTrades(url)
 			}
 			else {
@@ -128,7 +132,7 @@ csgoLounge.prototype.parseTradeLink = function (url){
 	request(options,
 		function (err, res, body) {
 			if(err){
-				debug('Got erorr, while requesting.Retrying',err)
+				debug('Got erorr, while requesting Link.Retrying',err)
 				self.parseTradeLink(url)
 			}
 			else {
@@ -138,14 +142,10 @@ csgoLounge.prototype.parseTradeLink = function (url){
 					debug('Bad cookies, cant get steamoffer links, exiting...')
 					process.exit(2)
 				}
-				//Debug
-				//fs.open("vrosts.html","w",0644, function(err,file_handle){
-				//    if(!err){ fs.write(file_handle,body,null,'utf8'); }
-				//});
 				//Getting steamoffer link
 				checkButtonExist = s('div#offer>a.buttonright').text()
-				diff = self.tradeList.length - self.totalMissingLinks.length
 				if(checkButtonExist) {
+					diff = self.tradeList.length - self.totalMissingLinks.length
 					s('div#offer>a.buttonright').each(function () {
 						tradeLink = s(this).attr('href')
 						self.tradeLinksArray.push(tradeLink)
@@ -158,6 +158,7 @@ csgoLounge.prototype.parseTradeLink = function (url){
 				}
 				else{
 					self.totalMissingLinks.push('ss')
+					diff = self.tradeList.length - self.totalMissingLinks.length
 					debug('The tradeoffer button is not exist')
 					if(self.tradeLinksArray.length >= diff ) {
 						debug('Got enougt links,emiting event...')
@@ -177,6 +178,6 @@ function unique (arr) {
 	return Object.keys(obj); // или собрать ключи перебором для IE8-
 }
 
-module.exports = csgoLounge
+module.exports = csgoLounge;
 
 

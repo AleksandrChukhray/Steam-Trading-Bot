@@ -122,7 +122,7 @@ steamAuth.prototype.getItemObjectFromSomeInventory = function(trade,itemName,ite
 					break
 				}
 			}
-			if (!item) {
+			if (item.length == 0) {
 				debug('Item was not found')
 				self.erorrTrade++;
 			}
@@ -134,9 +134,9 @@ steamAuth.prototype.getItemObjectFromSomeInventory = function(trade,itemName,ite
 }
 steamAuth.prototype.createOffer = function (steamID,accessToken,hisItemName,myItems,tradeMessage){
 	self = this
-	this.tradeId++;
 	var  hisItems=[];
 	var tradeId= this.tradeId
+	this.tradeId++;
 	if(!tradeMessage) {tradeMessage = 'Hey! Do you want to trade so?' }
 	var trade = self.offers.createOffer(steamID);
 	trade.addMyItems(myItems);
@@ -146,13 +146,22 @@ steamAuth.prototype.createOffer = function (steamID,accessToken,hisItemName,myIt
 		function tradesDone(self)		{
 			if (self.successTrade+self.erorrTrade == self.tradeId ){
 				debug('Done.Total trades:',self.tradeId,'. Success: ', self.successTrade,'. Erorr: ',self.erorrTrade, '.');
-				proccess.exit(1)
+				process.exit(1)
 			}
+			debug('Total trades:',self.tradeId,'. Success: ', self.successTrade,'. Erorr: ',self.erorrTrade, '.');
 		}
 		trade.send(tradeMessage, accessToken,function (err, status){
 			if (err) {
 				debug(err);
 				self.erorrTrade++;
+				// NEED REWORK
+				//debug('Got offer error, sleeping for a 5 sec')
+				//s = 5000
+				//var e = new Date().getTime() + (s);
+                //
+				//while (new Date().getTime() <= e) {
+				//	;
+				//}
 				tradesDone(self);
 
 			} else if (status == 'pending'){
@@ -167,16 +176,7 @@ steamAuth.prototype.createOffer = function (steamID,accessToken,hisItemName,myIt
 			}
 		});
 	})
-
 }
-
-cfg={
-	username : "truesupp",
-	password : "Avtf615b",
-	domain : 'glebka.me',
-	webApiKey : "asdasd"
-}
-//var lol = new steamAuth(cfg)
 
 
 module.exports = steamAuth;
