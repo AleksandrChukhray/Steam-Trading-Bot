@@ -1,0 +1,18 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Steambot CP</title>
+</head>
+<body>
+Current trade : <%=item %> -----> <%=currentInTrade %> <br>
+Status : <%
+ if(status){ %>
+<font color="red">In work</font>
+ <%}else{%>
+<font color="green">Awaiting for trade confirmation</font>
+ <%}%> <br>
+workingTime: <%=Math.floor(workingTime/60)%> min <br>
+<a href = 'http://steamcommunity.com/profiles/76561198127941514/'>Steam profile</a>
+
+</body>
+</html>

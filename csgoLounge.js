@@ -6,8 +6,9 @@ var http = require('http'),
 	debug = require('debug')('cslParser'),
   mysql      = require('mysql')
 
-var csgoLounge = function(item,cookies,maxPages){
+var csgoLounge = function(item,cookies){
 	var self = this
+
 	this.connection = mysql.createConnection({
 		host     : 'localhost',
 		user     : 'root',
@@ -15,52 +16,84 @@ var csgoLounge = function(item,cookies,maxPages){
 		database : 'steambot'
 	});
 	this.connection.connect();
+	this.id = Math.random();
 	this.loungeId;
 	this.tradeList = []
 	this.tradeLinksArray = []
 	this.totalMissingLinks = []
 	this.finalArray = []
-	if(!maxPages) {
-		maxPages=1
-	}
+	this.currentPage = 1;
+	this.parsedAllPages = false;
+	this.linksToParse = 30;
 	if(!cookies) {
-		cookies = 'PHPSESSID=qcgqquo4o50cp5clm75bs45lj5; tkz=c2cab3e2ff888ce4ecb06091e5a69db8; id=76561198063846956; token=ced748210fe6a8a2e439edd9040046de; __utmt=1; __utma=210545287.696016616.1440737987.1440867298.1440909464.10; __utmb=210545287.9.10.1440909464; __utmc=210545287; __utmz=210545287.1440737987.1.1.utmcsr=(direct)|utmccn=(direct)|utmcmd=(none)'
+		cookies = 'id=76561198063846956; token=ced748210fe6a8a2e439edd9040046de;  PHPSESSID=qcgqquo4o50cp5clm75bs45lj5;'//tkz=c2cab3e2ff888ce4ecb06091e5a69db8;'// __utmt=1; __utma=210545287.696016616.1440737987.1440867298.1440909464.10; __utmb=210545287.9.10.1440909464; __utmc=210545287; __utmz=210545287.1440737987.1.1.utmcsr=(direct)|utmccn=(direct)|utmcmd=(none)'
 	}
 	this.tradesPerPage = 20 //const
-	this.maxPages = maxPages
-	this.totalRequiredTradesNumber = this.maxPages*this.tradesPerPage
+	self.totalRequiredTradesNumber = this.tradesPerPage
 	this.cookies = request.cookie(cookies)
 	this.nameToLoungeId(item)
-	this.on('gotLoungeId',function(){
+	this.on('gotLoungeId' + self.id,function(){
 		this.parseLounge()
 	})
-	this.on('tradesParsingIsComplete',function(){
-		self.tradeList.forEach(function(item,i,arr){
-			 self.parseTradeLink(item)
-		})
+	self.on('pageParseComplete' + self.id,function(){
+		if(self.tradeList.length == 0){
+			self.emit('gotEnoughLinks'+self.id)		}
+			self.tradeList.forEach(function(item,i,arr){
+				 self.parseTradeLink(item)
+			})
 	})
-	this.on('linksParsingIsComplete',function (){
+	self.on('linksParsingIsComplete'+self.id,function(){
 		self.tradeLinksArray = unique(self.tradeLinksArray)
-		debug('Now we can handle gotten links, total unique links parsed: ', self.tradeLinksArray.length,'. Cutting...')
 		self.cutLinks()
+		debug('Amount of links',self.finalArray.length)
+		if((self.finalArray.length>=self.linksToParse)||(self.parsedAllPages)){
+			debug('Done.Parsed enought links. Emitting event: ', 'gotEnoughLinks'+self.id)
+			self.emit('gotEnoughLinks'+self.id)
+			self.tradeList = [];
+		}
+		else{
+			debug('Parsed not enought links. Let Parse one more page')
+			self.tradeLinksArray = [];
+			self.tradeList= [];
+			self.totalMissingLinks = [];
+			self.currentPage++;
+			self.parseLounge()
+		}
 	})
 }
 
 csgoLounge.prototype = new events.EventEmitter;
 
+csgoLounge.prototype.decodeKnifeItemName = function(name){
+	if (name[0] == '$') {
+		name = name.split("");
+		name[0] = 'â˜…';
+		name = name.join("");
+	}
+	return name
+}
+
+csgoLounge.prototype.encodeKnifeItemName = function(name){
+	if (name[0] == 'â˜…') {
+		name = name.split("");
+		name[0] = '$';
+		name = name.join("");
+	}
+	return name
+}
+
 csgoLounge.prototype.nameToLoungeId = function (name){
 	self = this
-	if(name[0] = '?'){
-		name = name.slice(2)
-	}
+	name = self.encodeKnifeItemName(name)
 	debug('Converting ',name,' to loungeID')
-	this.connection.query("SELECT id FROM loungeIds WHERE itemname = '" + name + "'", function(err, rows, fields) {
-		if (err) throw err;
+	this.connection.query("SELECT id FROM loungeIdstest WHERE itemname = '" + name + "'", function(err, rows, fields) {
+		if (err) debug(err);
 		self.loungeId = rows[0].id
 		debug('Got loungeID: ', rows[0].id)
-		self.emit('gotLoungeId')
+		self.emit('gotLoungeId'+self.id)
 	});
 }
+
 
 csgoLounge.prototype.cutLinks  = function(){
 	self  = this
@@ -91,12 +124,8 @@ csgoLounge.prototype.getLinks = function(id){
 
 csgoLounge.prototype.parseLounge = function (itemname){
 	var self = this
-	page = 1;
-	while(page <= self.maxPages) {
-		loungeUrl = 'http://csgolounge.com/result?&rquality%5B%5D=0&rdef_index%5B%5D=' + self.loungeId + '&p=' + page
-		self.parseTrades(loungeUrl)
-		page++;
-	}
+	loungeUrl = 'http://csgolounge.com/result?&rquality%5B%5D=0&rdef_index%5B%5D=' + self.loungeId + '&p=' + self.currentPage
+	self.parseTrades(loungeUrl)
 }
 csgoLounge.prototype.parseTrades = function(url){
 	var self = this
@@ -108,6 +137,11 @@ csgoLounge.prototype.parseTrades = function(url){
 			}
 			else {
 				var $ = cheerio.load(body);
+				tradesOnPage = $('.tradepoll').length;
+				if(tradesOnPage<20){
+					self.parsedAllPages = true;
+				}
+				self.totalRequiredTradesNumber =  tradesOnPage
 				$('div.tradeheader>a').each(function () {
 					extarUrl = $(this).attr('href')
 					tradeUrl = 'http://csgolounge.com/' + extarUrl
@@ -115,8 +149,8 @@ csgoLounge.prototype.parseTrades = function(url){
 				});
 				//Check the end of parsing
 				if (self.tradeList.length == self.totalRequiredTradesNumber) {
-					debug('Got enougt trades,emiting event...')
-					self.emit('tradesParsingIsComplete');
+					debug('Got enougt trades on a page,emiting event...')
+					self.emit('pageParseComplete'+self.id);
 				}
 			}
 		});
@@ -139,8 +173,13 @@ csgoLounge.prototype.parseTradeLink = function (url){
 				var s = cheerio.load(body);
 				checkCookies = s('a#logout').attr('href')
 				if(!checkCookies){
-					debug('Bad cookies, cant get steamoffer links, exiting...')
-					process.exit(2)
+					if(!(self.tradeLinksArray.length>0)) {
+						debug('Bad cookies, cant get steamoffer links, exiting...')
+						process.exit(2)
+					}
+					else{
+						debug('Bad cookies, but we already got some links, so continue...')
+					}
 				}
 				//Getting steamoffer link
 				checkButtonExist = s('div#offer>a.buttonright').text()
@@ -152,7 +191,7 @@ csgoLounge.prototype.parseTradeLink = function (url){
 						debug('Got ',self.tradeLinksArray.length,' out off ',diff,' links')
 						if(self.tradeLinksArray.length == diff ) {
 							debug('Got enougt links,emiting event...')
-							self.emit('linksParsingIsComplete');
+							self.emit('linksParsingIsComplete'+self.id);
 						}
 					});
 				}
@@ -162,7 +201,7 @@ csgoLounge.prototype.parseTradeLink = function (url){
 					debug('The tradeoffer button is not exist')
 					if(self.tradeLinksArray.length >= diff ) {
 						debug('Got enougt links,emiting event...')
-						self.emit('linksParsingIsComplete');
+						self.emit('linksParsingIsComplete'+self.id);
 					}
 				}
 
@@ -173,9 +212,9 @@ function unique (arr) {
 	var obj = {};
 	for (var i = 0; i < arr.length; i++) {
 		var str = arr[i];
-		obj[str] = true; // çàïîìíèòü ñòðîêó â âèäå ñâîéñòâà îáúåêòà
+		obj[str] = true; // Ð·Ð°Ð¿Ð¾Ð¼Ð½Ð¸Ñ‚ÑŒ ÑÑ‚Ñ€Ð¾ÐºÑƒ Ð² Ð²Ð¸Ð´Ðµ ÑÐ²Ð¾Ð¹ÑÑ‚Ð²Ð° Ð¾Ð±ÑŠÐµÐºÑ‚Ð°
 	}
-	return Object.keys(obj); // èëè ñîáðàòü êëþ÷è ïåðåáîðîì äëÿ IE8-
+	return Object.keys(obj); // Ð¸Ð»Ð¸ ÑÐ¾Ð±Ñ€Ð°Ñ‚ÑŒ ÐºÐ»ÑŽÑ‡Ð¸ Ð¿ÐµÑ€ÐµÐ±Ð¾Ñ€Ð¾Ð¼ Ð´Ð»Ñ IE8-
 }
 
 module.exports = csgoLounge;
